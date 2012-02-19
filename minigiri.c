@@ -18,6 +18,13 @@ doc_dealloc(xmlDocPtr doc)
     xmlFreeDoc(doc);
 }
 
+static void
+doc_mark(xmlNodePtr doc)
+{
+    rb_gc_mark(DOC_RUBY_OBJECT(doc));
+    rb_gc_mark(DOC_NODE_CACHE(doc));
+}
+
 static VALUE
 doc_read_memory(VALUE klass, VALUE string)
 {
@@ -32,7 +39,7 @@ doc_read_memory(VALUE klass, VALUE string)
     len = (int)RSTRING_LEN(string);
 
     doc = xmlReadMemory(c_buffer, len, NULL, NULL, XML_PARSE_RECOVER);
-    rb_doc = Data_Wrap_Struct(klass, 0, doc_dealloc, doc);
+    rb_doc = Data_Wrap_Struct(klass, doc_mark, doc_dealloc, doc);
 
     cache = rb_ary_new();
     rb_iv_set(rb_doc, "@node_cache", cache);
@@ -43,12 +50,6 @@ doc_read_memory(VALUE klass, VALUE string)
     doc->_private = tuple;
 
     return rb_doc;
-}
-
-static void
-node_mark(xmlNodePtr node)
-{
-    rb_gc_mark(DOC_RUBY_OBJECT(node->doc));
 }
 
 static VALUE
@@ -63,7 +64,7 @@ node_each(VALUE self)
     node_cache = DOC_NODE_CACHE(node->doc);
     
     while (child) {
-	rb_child = Data_Wrap_Struct(cNode, node_mark, 0, child);
+	rb_child = Data_Wrap_Struct(cNode, 0, 0, child);
 	rb_ary_push(node_cache, rb_child);
 	rb_yield(rb_child);
 	child = child->next;
